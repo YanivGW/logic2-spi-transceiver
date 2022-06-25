@@ -1,11 +1,11 @@
 {
-    "name": "stm32wl SPI Analyzer",
+    "name": "SPI Transceiver",
     "apiVersion": "1.0.0",
     "author": "Yaniv Wolfus",
     "version": "1.0.0",
-    "description": "Analzyer for the stm32wl transceiver protocol over SPI",
+    "description": "Analzyer for SPI transceivers. Currently supports the stm32wl's transceiver.",
     "extensions": {
-      "stm32wl SPI Analyzer": {
+      "SPI Transceiver": {
         "type": "HighLevelAnalyzer",
         "entryPoint": "SpiTransceiver.SpiTransceiver"
       }
