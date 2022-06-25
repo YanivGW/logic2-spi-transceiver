@@ -1,0 +1,13 @@
+{
+    "name": "stm32wl SPI Analyzer",
+    "apiVersion": "1.0.0",
+    "author": "Yaniv Wolfus",
+    "version": "1.0.0",
+    "description": "Analzyer for the stm32wl transceiver protocol over SPI",
+    "extensions": {
+      "stm32wl SPI Analyzer": {
+        "type": "HighLevelAnalyzer",
+        "entryPoint": "SpiTransceiver.SpiTransceiver"
+      }
+    }
+  }
