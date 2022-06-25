@@ -111,30 +111,63 @@ class SpiTransceiver(HighLevelAnalyzer):
         # Whether SPI is currently enabled
         self.spi_enable = False
 
-        # Start time of the transaction - equivalent to the start time of the "Enable" frame
+        # Start time of the transaction - equivalent to the start time of the first data frame
         self.transaction_start_time = None
 
-        # Whether there was an error.
-        self.error = False
+        # End time of the transaction - equivalent to the end time of the last data frame
+        self.transaction_end_time = None
 
     def handle_enable(self, frame: AnalyzerFrame):
         self.frames = []
         self.spi_enable = True
-        self.error = False
-        self.transaction_start_time = frame.start_time
+        self.transaction_start_time = None
+        self.transaction_end_time = None
 
     def reset(self):
         self.frames = []
         self.spi_enable = False
-        self.error = False
         self.transaction_start_time = None
+        self.transaction_end_time = None
 
     def is_valid_transaction(self) -> bool:
-        return self.spi_enable and (not self.error) and (self.transaction_start_time is not None)
+        return self.spi_enable and (self.transaction_start_time is not None)
 
     def handle_result(self, frame):
         if self.spi_enable:
-            self.frames.append(frame)
+            if self.transaction_start_time is None:
+                self.transaction_start_time = frame.start_time
+            self.transaction_end_time = frame.end_time
+            self.frames.append(frame)   
+
+    def handle_disable(self, frame):
+        if self.is_valid_transaction():
+            transaction = self.get_frame_data()
+            cmd = transaction["mosi"][0]
+            result = AnalyzerFrame(
+                "command",
+                self.transaction_start_time,
+                self.transaction_end_time,
+                {"cmd": COMMANDS.get(cmd, "Unknown")},
+            )
+        else:
+            result = AnalyzerFrame(
+                "error",
+                frame.start_time,
+                frame.end_time,
+                {
+                    "error_info": "Invalid SPI transaction (spi_enable={}, transaction_start_time={})".format(
+                        self.spi_enable,
+                        self.transaction_start_time,
+                    )
+                }
+            )
+
+        self.reset()
+        return result
+
+    def handle_error(self, frame):
+        print("Received 'error' type from input analyzer")
+        return
 
     def get_frame_data(self) -> dict:
         miso = bytearray()
@@ -148,44 +181,6 @@ class SpiTransceiver(HighLevelAnalyzer):
             "miso": bytes(miso),
             "mosi": bytes(mosi),
         }
-
-    def handle_disable(self, frame):
-        if self.is_valid_transaction():
-            transaction = self.get_frame_data()
-            cmd = transaction["mosi"][0]
-            result = AnalyzerFrame(
-                "command",
-                self.transaction_start_time,
-                frame.end_time,
-                {"cmd": COMMANDS.get(cmd, "Unknown")},
-            )
-        else:
-            result = AnalyzerFrame(
-                "error",
-                frame.start_time,
-                frame.end_time,
-                {
-                    "error_info": "Invalid SPI transaction (spi_enable={}, error={}, transaction_start_time={})".format(
-                        self.spi_enable,
-                        self.error,
-                        self.transaction_start_time,
-                    )
-                }
-            )
-
-        self.reset()
-        return result
-
-    def handle_error(self, frame):
-        result = AnalyzerFrame(
-            "error",
-            frame.start_time,
-            frame.end_time,
-            {
-                "error_info": "The clock was in the wrong state when the enable signal transitioned to active"
-            }
-        )
-        self.reset()
 
     def decode(self, frame: AnalyzerFrame):
         if frame.type == "enable":
