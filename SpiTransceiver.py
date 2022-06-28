@@ -139,16 +139,48 @@ class SpiTransceiver(HighLevelAnalyzer):
             self.transaction_end_time = frame.end_time
             self.frames.append(frame)   
 
+    def parse_command(self, cmd, transaction):
+        args = ""
+
+        # TODO: Parse more commands
+        if cmd is "SetRfFrequency":
+            freq = int.from_bytes(transaction["mosi"][1:5], "big")
+            args = f"{freq/1000000.0}MHz"
+
+        elif cmd is "WriteRegister":
+            reg = REGISTERS.get(int.from_bytes(transaction["mosi"][1:3], "big"), "UNKNOWN")
+            val = transaction["mosi"][3]
+            args = f"{reg},{str(val)}"
+
+        elif cmd is "SetPacketType":
+            ty = transaction["mosi"][1]
+            if ty is 0:
+                args = "FSK"
+            elif ty is 1:
+                args = "LORA"
+            else:
+                args = "UNKNOWN"
+            
+        return AnalyzerFrame(
+                "command",
+                self.transaction_start_time,
+                self.transaction_end_time,
+                {"cmd": f"{cmd}({args})"},
+        )
+
     def handle_disable(self, frame):
         if self.is_valid_transaction():
             transaction = self.get_frame_data()
             cmd = transaction["mosi"][0]
-            result = AnalyzerFrame(
-                "command",
-                self.transaction_start_time,
-                self.transaction_end_time,
-                {"cmd": COMMANDS.get(cmd, "Unknown")},
-            )
+            if cmd in COMMANDS:
+                result = self.parse_command(COMMANDS[cmd], transaction)
+            else:
+                result = AnalyzerFrame(
+                    "command",
+                    self.transaction_start_time,
+                    self.transaction_end_time,
+                    {"cmd": "UNKNOWN"},
+                )
         else:
             result = AnalyzerFrame(
                 "error",
